@@ -1,12 +1,14 @@
-import { Component } from 'react';
+import { classnames } from '@/shared/lib/styling';
 import styles from './Loader.module.scss';
 
-export class Loader extends Component {
-  render() {
-    return (
-      <div className={styles.container}>
-        <span className={styles.loader}></span>
-      </div>
-    );
-  }
+export interface LoaderProps {
+  className?: string;
 }
+
+export const Loader = ({ className }: LoaderProps) => {
+  return (
+    <div className={classnames(styles.container, className)} role="loader">
+      <span className={styles.loader}></span>
+    </div>
+  );
+};

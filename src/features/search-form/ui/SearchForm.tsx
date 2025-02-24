@@ -1,37 +1,71 @@
-import { createRef, Component, type FormEvent } from 'react';
+import { useEffect, useRef, type FormEvent } from 'react';
+import { useLocation, useNavigate } from 'react-router';
+import { useLocalStorage } from '@/shared/lib/storage';
+import { QueryParams } from '@/shared/api/characters';
 import { Input, Button } from '@/shared/ui/';
 import styles from './SearchForm.module.scss';
 
-interface SearchFormProps {
-  disabled: boolean;
-  defaultValue: string;
-  onSubmit: (query: string) => void;
-}
+const SEARCH_KEY = 'h3nnessey-search';
 
-export class SearchForm extends Component<SearchFormProps> {
-  private inputRef = createRef<HTMLInputElement>();
+let isFirstLoad = true;
 
-  private handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+export const SearchForm = () => {
+  const [search, setSearch] = useLocalStorage(SEARCH_KEY, '');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const query = this.inputRef.current?.value.trim() || '';
+    const newQuery = inputRef.current?.value.trim() || '';
 
-    this.props.onSubmit(query);
+    if (search === newQuery) return;
+
+    setSearch(newQuery);
+
+    navigate({
+      pathname: '/',
+      search: newQuery ? `?${QueryParams.Name}=${newQuery}` : '',
+    });
   };
 
-  render() {
-    const { disabled, defaultValue } = this.props;
+  useEffect(() => {
+    if (isFirstLoad) {
+      isFirstLoad = false;
 
-    return (
-      <form className={styles.form} onSubmit={this.handleSubmit}>
-        <Input
-          inputRef={this.inputRef}
-          disabled={disabled}
-          defaultValue={defaultValue}
-          placeholder="Search something..."
-        />
-        <Button text="Search" type="submit" disabled={disabled}></Button>
-      </form>
-    );
-  }
-}
+      const searchParams = new URLSearchParams(location.search);
+
+      if (search) {
+        searchParams.set(QueryParams.Name, search);
+      }
+
+      navigate(
+        {
+          pathname: location.pathname,
+          search: searchParams.toString(),
+        },
+        { replace: true }
+      );
+    } else {
+      if (inputRef.current) {
+        const searchParams = new URLSearchParams(location.search);
+        const newValue = searchParams.get(QueryParams.Name) || '';
+
+        inputRef.current.value = newValue;
+        setSearch(newValue);
+      }
+    }
+  }, [location.search, location.pathname, navigate, search, setSearch]);
+
+  return (
+    <form className={styles.form} onSubmit={handleSubmit}>
+      <Input
+        inputRef={inputRef}
+        defaultValue={search}
+        placeholder="Search something..."
+      />
+      <Button type="submit">Search</Button>
+    </form>
+  );
+};
