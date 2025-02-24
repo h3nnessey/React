@@ -1,130 +1,130 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { render, screen, fireEvent } from '@testing-library/react';
 import {
-  Character,
-  CharacterGender,
-  CharacterSpecies,
-  CharacterStatus,
-} from '@/shared/api/characters';
-import { CharacterDetails } from './CharacterDetails';
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterAll,
+  beforeAll,
+  afterEach,
+} from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { screen, fireEvent } from '@testing-library/react';
+import { server, renderWithProviders, mockCharacter } from '@/__tests__';
+import { CharacterDetails } from '@/entities/character/ui/character-details/CharacterDetails';
 
-const characterMock: Character = {
-  id: 3,
-  name: 'Morty Smith',
-  status: CharacterStatus.Alive,
-  species: CharacterSpecies.Human,
-  type: '',
-  gender: CharacterGender.Male,
-  origin: {
-    name: 'Earth',
-    url: 'https://rickandmortyapi.com/api/location/1',
-  },
-  location: {
-    name: 'Earth',
-    url: 'https://rickandmortyapi.com/api/location/20',
-  },
-  image: 'https://rickandmortyapi.com/api/character/avatar/2.jpeg',
-  episode: [
-    'https://rickandmortyapi.com/api/episode/1',
-    'https://rickandmortyapi.com/api/episode/2',
-  ],
-  url: 'https://rickandmortyapi.com/api/character/2',
-  created: '2017-11-04T18:50:21.651Z',
-};
-
-const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-
-const mockUseCharacter = vi.hoisted(() => vi.fn());
-
-vi.mock('@/shared/api/characters/hooks', () => ({
-  useCharacter: mockUseCharacter,
+vi.mock('@/shared/ui/components', () => ({
+  Loader: vi.fn(() => <div data-testid="loader">Loader</div>),
+  ErrorMessage: vi.fn(({ message }) => (
+    <div data-testid="error-message">{message}</div>
+  )),
+  Button: vi.fn(({ onClick, children }) => (
+    <button onClick={onClick} data-testid="close-button">
+      {children}
+    </button>
+  )),
 }));
+
+const url = 'https://rickandmortyapi.com/api/character/1';
+
+const mockUseNavigate = vi.hoisted(() => vi.fn());
+const mockUseParams = vi.hoisted(() => vi.fn());
+
+vi.mock(import('react-router'), async importOriginal => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useNavigate: mockUseNavigate,
+    useParams: mockUseParams,
+  };
+});
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
 
 describe('CharacterDetails', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseCharacter.mockReturnValue({
-      data: null,
-      error: null,
-      isLoading: false,
-    });
+    mockUseParams.mockReturnValue({ id: '1' });
+    mockUseNavigate.mockReturnValue(vi.fn());
   });
 
-  it('should display loader when loading', () => {
-    mockUseCharacter.mockReturnValue({
-      data: null,
-      error: null,
-      isLoading: true,
-    });
+  it('renders character details when data is loaded', async () => {
+    server.use(
+      http.get(url, () => {
+        return HttpResponse.json(mockCharacter);
+      })
+    );
 
-    render(
-      <MemoryRouter initialEntries={[`/${characterMock.id}`]}>
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/1']}>
         <Routes>
           <Route path="/:id" element={<CharacterDetails />} />
         </Routes>
       </MemoryRouter>
     );
 
-    const loaderElement = screen.getByRole('loader');
-    expect(loaderElement).toBeInTheDocument();
+    const { name, status, species, gender, origin, location, episode, image } =
+      mockCharacter;
+
+    expect(await screen.findByRole('img')).toHaveAttribute('src', image);
+    expect(await screen.findByRole('name')).toHaveTextContent(name);
+    expect(await screen.findByRole('status')).toHaveTextContent(status);
+    expect(await screen.findByRole('species')).toHaveTextContent(species);
+    expect(await screen.findByRole('gender')).toHaveTextContent(gender);
+    expect(await screen.findByRole('origin')).toHaveTextContent(origin.name);
+    expect(await screen.findByRole('location')).toHaveTextContent(
+      location.name
+    );
+    expect(await screen.findByRole('episodes')).toHaveTextContent(
+      episode.length.toString()
+    );
   });
 
-  it('should correctly display data', async () => {
-    mockUseCharacter.mockReturnValue({
-      data: characterMock,
-      error: null,
-      isLoading: false,
-    });
+  it('shows a loader while loading', async () => {
+    server.use(
+      http.get(url, async () => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return HttpResponse.json(mockCharacter);
+      })
+    );
 
-    render(
-      <MemoryRouter initialEntries={[`/${characterMock.id}`]}>
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/1']}>
         <Routes>
           <Route path="/:id" element={<CharacterDetails />} />
         </Routes>
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('name').lastChild).toHaveTextContent(
-      capitalize(characterMock.name)
-    );
-    expect(screen.getByRole('status').lastChild).toHaveTextContent(
-      capitalize(characterMock.status)
-    );
-    expect(screen.getByRole('species').lastChild).toHaveTextContent(
-      capitalize(characterMock.species)
-    );
-    expect(screen.getByRole('gender').lastChild).toHaveTextContent(
-      capitalize(characterMock.gender)
-    );
-    expect(screen.getByRole('origin').lastChild).toHaveTextContent(
-      capitalize(characterMock.origin.name)
-    );
-    expect(screen.getByRole('location').lastChild).toHaveTextContent(
-      capitalize(characterMock.location.name)
-    );
-    expect(screen.getByRole('episodes')).toHaveTextContent(
-      characterMock.episode.length.toString()
-    );
+    expect(await screen.findByTestId('loader')).toBeInTheDocument();
   });
 
-  it('should hide the component when the close button is clicked', async () => {
-    mockUseCharacter.mockReturnValue({
-      data: characterMock,
-      error: null,
-      isLoading: false,
-    });
+  it('navigates back to home page when close button is clicked', async () => {
+    server.use(
+      http.get(url, () => {
+        return HttpResponse.json(mockCharacter);
+      })
+    );
 
-    render(
-      <MemoryRouter initialEntries={[`/${characterMock.id}`]}>
+    const mockNavigate = vi.fn();
+
+    mockUseNavigate.mockReturnValue(mockNavigate);
+
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/1']}>
         <Routes>
           <Route path="/:id" element={<CharacterDetails />} />
         </Routes>
       </MemoryRouter>
     );
 
-    const closeButton = screen.getByRole('button', { name: '×' });
+    const closeButton = await screen.findByTestId('close-button');
+
     fireEvent.click(closeButton);
-    expect(closeButton).not.toBeInTheDocument();
+
+    expect(mockNavigate).toHaveBeenCalledWith({ pathname: '/', search: '' });
   });
 });

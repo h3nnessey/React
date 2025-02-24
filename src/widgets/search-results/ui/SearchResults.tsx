@@ -2,13 +2,14 @@ import type { MouseEvent } from 'react';
 import {
   useNavigate,
   useSearchParams,
-  Outlet,
   useLocation,
   useParams,
+  Outlet,
 } from 'react-router';
-import { useCharacters, QueryParams } from '@/shared/api/characters';
+import { ErrorMessage, Pagination } from '@/shared/ui/components';
 import { CharacterCardList } from '@/entities/character';
-import { Pagination } from '@/features/pagination';
+import { useGetCharactersQuery } from '@/entities/character/api/characterApi';
+import { deserializeError } from '@/entities/character/api/deserializeError';
 import styles from './SearchResults.module.scss';
 
 export const SearchResults = () => {
@@ -17,12 +18,15 @@ export const SearchResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const query = searchParams.get(QueryParams.Name) || '';
-  const page = Number(searchParams.get(QueryParams.Page)) || 1;
+  const name = searchParams.get('name') || '';
+  const page = Number(searchParams.get('page')) || 1;
 
-  const { data, error, isLoading } = useCharacters(query, page);
+  const { data, isLoading, error } = useGetCharactersQuery({
+    page,
+    name,
+  });
 
-  const handleClose = (event: MouseEvent<HTMLDivElement>) => {
+  const handleCardClose = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
 
     if (id) {
@@ -38,19 +42,38 @@ export const SearchResults = () => {
     }
   };
 
+  const handlePageChange = (page: number) => {
+    const searchParams = new URLSearchParams(location.search);
+
+    searchParams.set('page', page.toString());
+
+    navigate({
+      pathname: '/',
+      search: searchParams.toString(),
+    });
+  };
+
+  if (error) {
+    return <ErrorMessage message={deserializeError(error)} />;
+  }
+
   return (
     <>
       <Pagination
         pages={data?.info.pages || 0}
         currentPage={page}
         disabled={isLoading}
+        onPageChange={handlePageChange}
         className={styles.pagination}
       />
-      <div className={styles.container} onClick={handleClose}>
+      <div
+        className={styles.container}
+        onClick={handleCardClose}
+        data-testid="search-results-container"
+      >
         <CharacterCardList
           characters={data?.results || []}
           isLoading={isLoading}
-          error={error}
           className={styles.list}
         />
         <Outlet />

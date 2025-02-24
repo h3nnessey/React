@@ -1,6 +1,7 @@
 import { useLocation, useNavigate, useParams } from 'react-router';
-import { useCharacter } from '@/shared/api/characters/hooks';
-import { Button, ErrorMessage, Loader } from '@/shared/ui';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { Button, ErrorMessage, Loader } from '@/shared/ui/components';
+import { useGetCharacterByIdQuery, deserializeError } from '../../api';
 import styles from './CharacterDetails.module.scss';
 
 export const CharacterDetails = () => {
@@ -8,7 +9,9 @@ export const CharacterDetails = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { data, error, isLoading } = useCharacter(Number(id));
+  const { data, isLoading, isError, error } = useGetCharacterByIdQuery(
+    id ?? skipToken
+  );
 
   const handleClick = () => {
     navigate({
@@ -18,9 +21,9 @@ export const CharacterDetails = () => {
   };
 
   return (
-    <div className={styles.container} key={id} role="details">
+    <div className={styles.container} key={id} role="character-details">
+      {isError && <ErrorMessage message={deserializeError(error)} />}
       {isLoading && <Loader />}
-      {error && <ErrorMessage message={error} />}
       {data && (
         <>
           <img
@@ -31,37 +34,37 @@ export const CharacterDetails = () => {
           />
           <table className={styles.table}>
             <tbody>
-              <tr role="name">
+              <tr>
                 <th>Name</th>
-                <td>{data.name}</td>
+                <td role="name">{data.name}</td>
               </tr>
-              <tr role="status">
+              <tr>
                 <th>Status</th>
-                <td>{data.status}</td>
+                <td role="status">{data.status}</td>
               </tr>
-              <tr role="type">
+              <tr>
                 <th>Type</th>
-                <td>{data.type || 'unknown'}</td>
+                <td role="type">{data.type || 'unknown'}</td>
               </tr>
-              <tr role="species">
+              <tr>
                 <th>Species</th>
-                <td>{data.species}</td>
+                <td role="species">{data.species}</td>
               </tr>
-              <tr role="gender">
+              <tr>
                 <th>Gender</th>
-                <td>{data.gender}</td>
+                <td role="gender">{data.gender}</td>
               </tr>
-              <tr role="origin">
+              <tr>
                 <th>Origin</th>
-                <td>{data.origin.name}</td>
+                <td role="origin">{data.origin.name}</td>
               </tr>
-              <tr role="location">
+              <tr>
                 <th>Location</th>
-                <td>{data.location.name}</td>
+                <td role="location">{data.location.name}</td>
               </tr>
-              <tr role="episodes">
+              <tr>
                 <th>Episodes</th>
-                <td>{data.episode.length}</td>
+                <td role="episodes">{data.episode.length}</td>
               </tr>
             </tbody>
           </table>
